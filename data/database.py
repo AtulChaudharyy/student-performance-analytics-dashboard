@@ -1,12 +1,18 @@
 """
 Database management module for Student Performance Analytics Dashboard (SPAD).
 Handles SQLite operations, metric calculations, and default data seeding.
+Includes multi-thread locking, WAL journal mode, and retry resilience against database lockouts.
 """
 
 import os
+import time
 import sqlite3
+import threading
 import tempfile
 from typing import Dict, Any, List, Optional, Tuple
+
+# Re-entrant thread lock for database operations
+DB_LOCK = threading.RLock()
 
 
 def get_database_path() -> str:
@@ -59,7 +65,6 @@ def calculate_metrics(
         grade = "F"
 
     # Status / Needs Improvement identification
-    # A student needs improvement if overall percentage < 50% OR attendance < 75% OR failed in any subject (< 40)
     failed_subject = any(score < 40.0 for score in [math, science, english, history, cs])
     if percentage < 50.0 or attendance < 75.0 or failed_subject:
         status = "Needs Improvement"
@@ -72,51 +77,73 @@ def calculate_metrics(
 
 
 def get_db_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
-    """Creates a database connection with concurrency safety and dict-like row access."""
-    path = db_path or get_database_path()
+    """Creates a database connection with autocommit isolation, WAL journal mode, and long busy timeout."""
+    path = db_path or os.environ.get("DATABASE_PATH") or DEFAULT_DB_PATH
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    conn = sqlite3.connect(path, timeout=30.0)
+    # isolation_level=None enables autocommit mode to prevent lingering transaction locks
+    conn = sqlite3.connect(path, timeout=60.0, isolation_level=None)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA busy_timeout=5000;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=60000;")
     except sqlite3.OperationalError:
         pass
     return conn
 
 
+def execute_with_retry(fn, max_retries=6, initial_delay=0.1):
+    """Executes a function and retries automatically if SQLite reports database is locked."""
+    delay = initial_delay
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() or "busy" in str(e).lower():
+                last_err = e
+                time.sleep(delay)
+                delay *= 2
+            else:
+                raise
+    raise last_err
+
+
 def init_db(db_path: Optional[str] = None) -> None:
     """Initializes the students table if it doesn't already exist."""
-    conn = get_db_connection(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            roll_number TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
-            department TEXT NOT NULL,
-            semester INTEGER NOT NULL,
-            math_marks REAL NOT NULL,
-            science_marks REAL NOT NULL,
-            english_marks REAL NOT NULL,
-            history_marks REAL NOT NULL,
-            cs_marks REAL NOT NULL,
-            attendance REAL NOT NULL,
-            total_marks REAL NOT NULL,
-            percentage REAL NOT NULL,
-            grade TEXT NOT NULL,
-            status TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
+    def _init():
+        with DB_LOCK:
+            conn = get_db_connection(db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS students (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    roll_number TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    department TEXT NOT NULL,
+                    semester INTEGER NOT NULL,
+                    math_marks REAL NOT NULL,
+                    science_marks REAL NOT NULL,
+                    english_marks REAL NOT NULL,
+                    history_marks REAL NOT NULL,
+                    cs_marks REAL NOT NULL,
+                    attendance REAL NOT NULL,
+                    total_marks REAL NOT NULL,
+                    percentage REAL NOT NULL,
+                    grade TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cursor.execute("SELECT COUNT(*) as count FROM students")
+            count = cursor.fetchone()["count"]
+            cursor.close()
+            conn.close()
 
-    # Check if empty, seed default data
-    cursor.execute("SELECT COUNT(*) as count FROM students")
-    count = cursor.fetchone()["count"]
-    if count == 0:
-        seed_default_students(db_path)
-    conn.close()
+            if count == 0:
+                seed_default_students(db_path)
+
+    execute_with_retry(_init)
 
 
 def seed_default_students(db_path: Optional[str] = None) -> None:
@@ -136,44 +163,60 @@ def seed_default_students(db_path: Optional[str] = None) -> None:
         ("DS112", "Riya Sen", "Data Science", 5, 89, 93, 87, 88, 94, 91.5)
     ]
 
-    conn = get_db_connection(db_path)
-    cursor = conn.cursor()
-    for s in sample_students:
-        roll, name, dept, sem, math, sci, eng, hist, cs, att = s
-        tot, pct, grd, sts = calculate_metrics(math, sci, eng, hist, cs, att)
-        cursor.execute("""
-            INSERT OR IGNORE INTO students (
-                roll_number, name, department, semester,
-                math_marks, science_marks, english_marks, history_marks, cs_marks,
-                attendance, total_marks, percentage, grade, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (roll, name, dept, sem, math, sci, eng, hist, cs, att, tot, pct, grd, sts))
-    conn.commit()
-    conn.close()
+    def _seed():
+        with DB_LOCK:
+            conn = get_db_connection(db_path)
+            cursor = conn.cursor()
+            for s in sample_students:
+                roll, name, dept, sem, math, sci, eng, hist, cs, att = s
+                tot, pct, grd, sts = calculate_metrics(math, sci, eng, hist, cs, att)
+                cursor.execute("""
+                    INSERT OR IGNORE INTO students (
+                        roll_number, name, department, semester,
+                        math_marks, science_marks, english_marks, history_marks, cs_marks,
+                        attendance, total_marks, percentage, grade, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (roll, name, dept, sem, math, sci, eng, hist, cs, att, tot, pct, grd, sts))
+            cursor.close()
+            conn.close()
+
+    execute_with_retry(_seed)
 
 
 def get_all_students(db_path: Optional[str] = None) -> List[Dict[str, Any]]:
     """Retrieve all student records."""
-    conn = get_db_connection(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM students ORDER BY roll_number ASC")
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
+    def _get():
+        with DB_LOCK:
+            conn = get_db_connection(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM students ORDER BY roll_number ASC")
+            rows = cursor.fetchall()
+            results = [dict(row) for row in rows]
+            cursor.close()
+            conn.close()
+            return results
+
+    return execute_with_retry(_get)
 
 
 def get_student_by_id(student_id: int, db_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Retrieve a single student record by ID."""
-    conn = get_db_connection(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM students WHERE id = ?", (student_id,))
-    row = cursor.fetchone()
-    conn.close()
-    return dict(row) if row else None
+    def _get_id():
+        with DB_LOCK:
+            conn = get_db_connection(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM students WHERE id = ?", (student_id,))
+            row = cursor.fetchone()
+            result = dict(row) if row else None
+            cursor.close()
+            conn.close()
+            return result
+
+    return execute_with_retry(_get_id)
 
 
 def add_student(data: Dict[str, Any], db_path: Optional[str] = None) -> Dict[str, Any]:
-    """Add a new student record."""
+    """Add a new student record with thread safety and lock retry."""
     roll = str(data["roll_number"]).strip().upper()
     name = str(data["name"]).strip()
     dept = str(data.get("department", "General")).strip()
@@ -188,26 +231,30 @@ def add_student(data: Dict[str, Any], db_path: Optional[str] = None) -> Dict[str
 
     total, pct, grade, status = calculate_metrics(math, sci, eng, hist, cs, att)
 
-    conn = get_db_connection(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO students (
-            roll_number, name, department, semester,
-            math_marks, science_marks, english_marks, history_marks, cs_marks,
-            attendance, total_marks, percentage, grade, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        roll, name, dept, sem,
-        math, sci, eng, hist, cs, att,
-        total, pct, grade, status
-    ))
-    conn.commit()
-    new_id = cursor.lastrowid
-    conn.close()
+    def _insert():
+        with DB_LOCK:
+            conn = get_db_connection(db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO students (
+                    roll_number, name, department, semester,
+                    math_marks, science_marks, english_marks, history_marks, cs_marks,
+                    attendance, total_marks, percentage, grade, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                roll, name, dept, sem,
+                math, sci, eng, hist, cs, att,
+                total, pct, grade, status
+            ))
+            new_id = cursor.lastrowid
+            cursor.close()
+            conn.close()
 
-    if new_id is None:
-        raise RuntimeError("Insert operation did not return an inserted row ID.")
+            if new_id is None:
+                raise RuntimeError("Insert operation did not return an inserted row ID.")
+            return new_id
 
+    new_id = execute_with_retry(_insert)
     saved = get_student_by_id(new_id, db_path)
     if not saved:
         raise RuntimeError(f"Failed to retrieve student with ID {new_id} after creation.")
@@ -230,48 +277,56 @@ def update_student(student_id: int, data: Dict[str, Any], db_path: Optional[str]
 
     total, pct, grade, status = calculate_metrics(math, sci, eng, hist, cs, att)
 
-    conn = get_db_connection(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE students SET
-            roll_number = ?,
-            name = ?,
-            department = ?,
-            semester = ?,
-            math_marks = ?,
-            science_marks = ?,
-            english_marks = ?,
-            history_marks = ?,
-            cs_marks = ?,
-            attendance = ?,
-            total_marks = ?,
-            percentage = ?,
-            grade = ?,
-            status = ?
-        WHERE id = ?
-    """, (
-        data.get("roll_number", student["roll_number"]).strip().upper(),
-        data.get("name", student["name"]).strip(),
-        data.get("department", student["department"]).strip(),
-        sem,
-        math, sci, eng, hist, cs, att,
-        total, pct, grade, status,
-        student_id
-    ))
-    conn.commit()
-    conn.close()
+    def _update():
+        with DB_LOCK:
+            conn = get_db_connection(db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE students SET
+                    roll_number = ?,
+                    name = ?,
+                    department = ?,
+                    semester = ?,
+                    math_marks = ?,
+                    science_marks = ?,
+                    english_marks = ?,
+                    history_marks = ?,
+                    cs_marks = ?,
+                    attendance = ?,
+                    total_marks = ?,
+                    percentage = ?,
+                    grade = ?,
+                    status = ?
+                WHERE id = ?
+            """, (
+                data.get("roll_number", student["roll_number"]).strip().upper(),
+                data.get("name", student["name"]).strip(),
+                data.get("department", student["department"]).strip(),
+                sem,
+                math, sci, eng, hist, cs, att,
+                total, pct, grade, status,
+                student_id
+            ))
+            cursor.close()
+            conn.close()
+
+    execute_with_retry(_update)
     return get_student_by_id(student_id, db_path)
 
 
 def delete_student(student_id: int, db_path: Optional[str] = None) -> bool:
     """Delete a student record."""
-    conn = get_db_connection(db_path)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM students WHERE id = ?", (student_id,))
-    deleted = cursor.rowcount > 0
-    conn.commit()
-    conn.close()
-    return deleted
+    def _delete():
+        with DB_LOCK:
+            conn = get_db_connection(db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM students WHERE id = ?", (student_id,))
+            deleted = cursor.rowcount > 0
+            cursor.close()
+            conn.close()
+            return deleted
+
+    return execute_with_retry(_delete)
 
 
 def get_analytics_summary(db_path: Optional[str] = None) -> Dict[str, Any]:

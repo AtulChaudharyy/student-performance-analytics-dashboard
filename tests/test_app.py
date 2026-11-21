@@ -32,11 +32,13 @@ def client():
     import data.database
     original_path = data.database.DEFAULT_DB_PATH
     data.database.DEFAULT_DB_PATH = db_path
+    os.environ["DATABASE_PATH"] = db_path
 
     with app.test_client() as test_client:
         yield test_client
 
     # Cleanup
+    os.environ.pop("DATABASE_PATH", None)
     data.database.DEFAULT_DB_PATH = original_path
     os.close(db_fd)
     import gc

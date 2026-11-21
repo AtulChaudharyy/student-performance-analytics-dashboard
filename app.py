@@ -10,6 +10,7 @@ import datetime
 from flask import Flask, render_template, request, jsonify, Response
 from data.database import (
     init_db,
+    get_db_connection,
     get_all_students,
     get_student_by_id,
     add_student,
@@ -37,13 +38,18 @@ def index():
 def health():
     """Health check endpoint for Docker container and Cloud monitoring."""
     try:
-        summary = get_analytics_summary()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM students")
+        count = cursor.fetchone()["count"]
+        cursor.close()
+        conn.close()
         return jsonify({
             "status": "healthy",
             "service": "Student Performance Analytics Dashboard",
             "version": "1.0.0",
             "database": "connected",
-            "students_recorded": summary["total_students"],
+            "students_recorded": count,
             "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
         }), 200
     except Exception as e:
