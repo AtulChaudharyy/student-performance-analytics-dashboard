@@ -3,75 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Question 9: Project Architecture Diagram - SPAD</title>
+    <title>System Architecture - Student Performance Analytics Dashboard</title>
     <style>
         body {
             margin: 0;
-            padding: 24px;
-            background: #e2e8f0;
+            padding: 32px 20px;
+            background: #f1f5f9;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
+            color: #0f172a;
         }
         .header {
             max-width: 960px;
             width: 100%;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
         }
         .header h1 {
             margin: 0;
-            font-size: 1.25rem;
+            font-size: 1.4rem;
+            font-weight: 700;
             color: #0f172a;
         }
         .header p {
             margin: 4px 0 0;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             color: #475569;
+        }
+        .badge {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #3730a3;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            border: 1px solid #c7d2fe;
         }
         .diagram-container {
             max-width: 960px;
             width: 100%;
             background: #ffffff;
             border-radius: 16px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
             overflow: hidden;
+            border: 1px solid #e2e8f0;
         }
         img, svg {
             width: 100%;
             height: auto;
             display: block;
         }
-        .instruction-card {
+        .architecture-notes {
             max-width: 960px;
             width: 100%;
-            margin-top: 16px;
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
-            border-radius: 8px;
-            padding: 12px 16px;
-            font-size: 0.85rem;
-            color: #1e40af;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .note-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .note-card h3 {
+            margin: 0 0 6px 0;
+            font-size: 0.95rem;
+            color: #1e293b;
+        }
+        .note-card p {
+            margin: 0;
+            font-size: 0.82rem;
+            color: #64748b;
+            line-height: 1.45;
         }
     </style>
 </head>
 <body>
     <div class="header">
         <div>
-            <h1>Project Architecture Diagram (Question 9)</h1>
-            <p>Student Performance Analytics Dashboard – Cloud-Based DevOps Application</p>
+            <h1>System Architecture & Pipeline Topology</h1>
+            <p>Student Performance Analytics Dashboard (SPAD) — Cloud-Native DevOps Architecture</p>
+        </div>
+        <div>
+            <span class="badge">Production Design v1.0</span>
         </div>
     </div>
 
     <div class="diagram-container">
-        <img src="architecture_diagram.svg" alt="Project Architecture Diagram">
+        <img src="architecture_diagram.svg" alt="SPAD System Architecture Diagram">
     </div>
 
-    <div class="instruction-card">
-        <strong>📸 Form Screenshot Guide:</strong> Take a screenshot of this architecture diagram and upload it to <strong>Question 9</strong> of your evaluation form.
+    <div class="architecture-notes">
+        <div class="note-card">
+            <h3>Frontend & Client Layer</h3>
+            <p>HTML5, responsive CSS3, and dynamic Chart.js dashboards connecting to backend RESTful endpoints with asynchronous JSON fetch operations.</p>
+        </div>
+        <div class="note-card">
+            <h3>Application & Data Tier</h3>
+            <p>Python 3.11 Flask WSGI application with embedded SQLite database, analytical KPI computation engine, and automatic seeding.</p>
+        </div>
+        <div class="note-card">
+            <h3>DevOps & Cloud Runtime</h3>
+            <p>Dockerized container environment (`python:3.11-slim`), automated GitHub Actions CI/CD pipeline, and continuous deployment on Render Web Services.</p>
+        </div>
     </div>
 </body>
 </html>

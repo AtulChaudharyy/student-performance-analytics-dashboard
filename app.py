@@ -68,9 +68,9 @@ def api_get_students():
 def api_add_student():
     """Creates a new student record."""
     try:
-        data = request.get_json()
+        data = request.get_json(force=True, silent=True)
         if not data:
-            return jsonify({"success": False, "error": "Request body must be JSON."}), 400
+            return jsonify({"success": False, "error": "Request body must be valid JSON."}), 400
 
         required_fields = [
             "roll_number", "name", "department", "semester",
@@ -78,28 +78,40 @@ def api_add_student():
             "cs_marks", "attendance"
         ]
         for field in required_fields:
-            if field not in data or data[field] is None or data[field] == "":
-                return jsonify({"success": False, "error": f"Missing required field: '{field}'."}), 400
+            if field not in data or data[field] is None or str(data[field]).strip() == "":
+                readable_field = field.replace("_", " ").capitalize()
+                return jsonify({"success": False, "error": f"Please provide {readable_field}."}), 400
 
-        # Validate score ranges
+        # Validate score ranges safely
         score_fields = ["math_marks", "science_marks", "english_marks", "history_marks", "cs_marks"]
         for sf in score_fields:
-            val = float(data[sf])
-            if val < 0 or val > 100:
-                return jsonify({"success": False, "error": f"{sf} must be between 0 and 100."}), 400
+            try:
+                val = float(data[sf])
+            except (ValueError, TypeError):
+                return jsonify({"success": False, "error": f"{sf.replace('_', ' ').capitalize()} must be a valid number."}), 400
 
-        att = float(data["attendance"])
+            if val < 0 or val > 100:
+                return jsonify({"success": False, "error": f"{sf.replace('_', ' ').capitalize()} must be between 0 and 100."}), 400
+
+        try:
+            att = float(data["attendance"])
+        except (ValueError, TypeError):
+            return jsonify({"success": False, "error": "Attendance must be a valid number."}), 400
+
         if att < 0 or att > 100:
             return jsonify({"success": False, "error": "Attendance must be between 0 and 100."}), 400
 
         created = add_student(data)
+        print(f"[API] Successfully created student {created['roll_number']} - {created['name']}", flush=True)
         return jsonify({"success": True, "message": "Student created successfully.", "data": created}), 201
 
     except Exception as e:
         err_msg = str(e)
-        if "UNIQUE constraint failed" in err_msg:
-            return jsonify({"success": False, "error": "A student with this Roll Number already exists."}), 409
-        return jsonify({"success": False, "error": err_msg}), 500
+        print(f"[API ERROR] Failed to create student: {err_msg}", flush=True)
+        if "UNIQUE constraint failed" in err_msg or "integrityerror" in err_msg.lower():
+            roll = data.get("roll_number", "") if isinstance(data, dict) else ""
+            return jsonify({"success": False, "error": f"A student with Roll Number '{roll}' already exists."}), 409
+        return jsonify({"success": False, "error": f"Database error: {err_msg}"}), 500
 
 
 @app.route("/api/students/<int:student_id>", methods=["GET"])

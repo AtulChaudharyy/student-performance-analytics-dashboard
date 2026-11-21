@@ -1,6 +1,6 @@
 """
-Utility script to create the clean submission ZIP file for Question 17.
-Excludes virtual environments, caches, and unnecessary files.
+Utility script to create the clean distribution ZIP archive.
+Excludes virtual environments, caches, and development artifacts.
 """
 
 import os
@@ -41,7 +41,7 @@ def create_zip():
     size_mb = os.path.getsize(zip_path) / (1024 * 1024)
     print("=" * 60)
     print(f"SUCCESS: Created {OUTPUT_ZIP} ({file_count} files, {size_mb:.2f} MB)")
-    print("Upload this file to Google Drive and paste the shareable link in Question 17.")
+    print("Project package is ready for distribution and deployment.")
     print("=" * 60)
 
 if __name__ == "__main__":

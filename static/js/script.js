@@ -32,7 +32,11 @@ async function loadDashboardData() {
             allStudents = studentsData.data;
             filteredStudents = [...allStudents];
             renderKPIs(analyticsData.data);
-            renderCharts(analyticsData.data);
+            try {
+                renderCharts(analyticsData.data);
+            } catch (chartErr) {
+                console.warn("Chart rendering warning:", chartErr);
+            }
             renderTable(filteredStudents);
         } else {
             showAlert("Failed to load dashboard data.", true);
@@ -67,138 +71,171 @@ function renderKPIs(analytics) {
  * Render or update Chart.js visualizations
  */
 function renderCharts(analytics) {
+    if (typeof Chart === "undefined") {
+        console.warn("Chart.js is not loaded.");
+        return;
+    }
+
     // 1. Grade Distribution Chart
-    const gradeCtx = document.getElementById("gradeChart").getContext("2d");
-    if (chartInstances.gradeChart) chartInstances.gradeChart.destroy();
-    
-    const gradeLabels = Object.keys(analytics.grade_distribution);
-    const gradeCounts = Object.values(analytics.grade_distribution);
-    
-    chartInstances.gradeChart = new Chart(gradeCtx, {
-        type: "doughnut",
-        data: {
-            labels: gradeLabels,
-            datasets: [{
-                data: gradeCounts,
-                backgroundColor: [
-                    "#10b981", // A+ Emerald
-                    "#3b82f6", // A Blue
-                    "#8b5cf6", // B Purple
-                    "#f59e0b", // C Amber
-                    "#f97316", // D Orange
-                    "#ef4444"  // F Red
-                ],
-                borderWidth: 2,
-                borderColor: "#ffffff"
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } }
-            },
-            cutout: "65%"
+    try {
+        const gradeCanvas = document.getElementById("gradeChart");
+        if (gradeCanvas) {
+            const gradeCtx = gradeCanvas.getContext("2d");
+            if (chartInstances.gradeChart) chartInstances.gradeChart.destroy();
+            
+            const gradeLabels = Object.keys(analytics.grade_distribution || {});
+            const gradeCounts = Object.values(analytics.grade_distribution || {});
+            
+            chartInstances.gradeChart = new Chart(gradeCtx, {
+                type: "doughnut",
+                data: {
+                    labels: gradeLabels,
+                    datasets: [{
+                        data: gradeCounts,
+                        backgroundColor: [
+                            "#10b981", // A+ Emerald
+                            "#3b82f6", // A Blue
+                            "#8b5cf6", // B Purple
+                            "#f59e0b", // C Amber
+                            "#f97316", // D Orange
+                            "#ef4444"  // F Red
+                        ],
+                        borderWidth: 2,
+                        borderColor: "#ffffff"
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } }
+                    },
+                    cutout: "65%"
+                }
+            });
         }
-    });
+    } catch (e) {
+        console.error("Error creating gradeChart:", e);
+    }
 
     // 2. Subject-Wise Average Scores
-    const subjectCtx = document.getElementById("subjectChart").getContext("2d");
-    if (chartInstances.subjectChart) chartInstances.subjectChart.destroy();
+    try {
+        const subjectCanvas = document.getElementById("subjectChart");
+        if (subjectCanvas) {
+            const subjectCtx = subjectCanvas.getContext("2d");
+            if (chartInstances.subjectChart) chartInstances.subjectChart.destroy();
 
-    const subjectLabels = Object.keys(analytics.subject_averages);
-    const subjectVals = Object.values(analytics.subject_averages);
+            const subjectLabels = Object.keys(analytics.subject_averages || {});
+            const subjectVals = Object.values(analytics.subject_averages || {});
 
-    chartInstances.subjectChart = new Chart(subjectCtx, {
-        type: "bar",
-        data: {
-            labels: subjectLabels,
-            datasets: [{
-                label: "Average Score",
-                data: subjectVals,
-                backgroundColor: [
-                    "rgba(79, 70, 229, 0.8)",
-                    "rgba(6, 182, 212, 0.8)",
-                    "rgba(16, 185, 129, 0.8)",
-                    "rgba(245, 158, 11, 0.8)",
-                    "rgba(139, 92, 246, 0.8)"
-                ],
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { min: 0, max: 100, ticks: { stepSize: 20 } }
-            },
-            plugins: {
-                legend: { display: false }
-            }
+            chartInstances.subjectChart = new Chart(subjectCtx, {
+                type: "bar",
+                data: {
+                    labels: subjectLabels,
+                    datasets: [{
+                        label: "Average Score",
+                        data: subjectVals,
+                        backgroundColor: [
+                            "rgba(79, 70, 229, 0.8)",
+                            "rgba(6, 182, 212, 0.8)",
+                            "rgba(16, 185, 129, 0.8)",
+                            "rgba(245, 158, 11, 0.8)",
+                            "rgba(139, 92, 246, 0.8)"
+                        ],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 0, max: 100, ticks: { stepSize: 20 } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
         }
-    });
+    } catch (e) {
+        console.error("Error creating subjectChart:", e);
+    }
 
     // 3. Department Performance Comparison
-    const deptCtx = document.getElementById("deptChart").getContext("2d");
-    if (chartInstances.deptChart) chartInstances.deptChart.destroy();
+    try {
+        const deptCanvas = document.getElementById("deptChart");
+        if (deptCanvas) {
+            const deptCtx = deptCanvas.getContext("2d");
+            if (chartInstances.deptChart) chartInstances.deptChart.destroy();
 
-    const deptLabels = Object.keys(analytics.department_averages);
-    const deptVals = Object.values(analytics.department_averages);
+            const deptLabels = Object.keys(analytics.department_averages || {});
+            const deptVals = Object.values(analytics.department_averages || {});
 
-    chartInstances.deptChart = new Chart(deptCtx, {
-        type: "bar",
-        data: {
-            labels: deptLabels,
-            datasets: [{
-                label: "Dept Average %",
-                data: deptVals,
-                backgroundColor: "rgba(59, 130, 246, 0.75)",
-                borderColor: "#3b82f6",
-                borderWidth: 1,
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: "y",
-            scales: {
-                x: { min: 0, max: 100 }
-            },
-            plugins: {
-                legend: { display: false }
-            }
+            chartInstances.deptChart = new Chart(deptCtx, {
+                type: "bar",
+                data: {
+                    labels: deptLabels,
+                    datasets: [{
+                        label: "Dept Average %",
+                        data: deptVals,
+                        backgroundColor: "rgba(59, 130, 246, 0.75)",
+                        borderColor: "#3b82f6",
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: "y",
+                    scales: {
+                        x: { min: 0, max: 100 }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
         }
-    });
+    } catch (e) {
+        console.error("Error creating deptChart:", e);
+    }
 
     // 4. Academic Standing Distribution
-    const statusCtx = document.getElementById("statusChart").getContext("2d");
-    if (chartInstances.statusChart) chartInstances.statusChart.destroy();
+    try {
+        const statusCanvas = document.getElementById("statusChart");
+        if (statusCanvas) {
+            const statusCtx = statusCanvas.getContext("2d");
+            if (chartInstances.statusChart) chartInstances.statusChart.destroy();
 
-    const statusLabels = Object.keys(analytics.status_distribution);
-    const statusCounts = Object.values(analytics.status_distribution);
+            const statusLabels = Object.keys(analytics.status_distribution || {});
+            const statusCounts = Object.values(analytics.status_distribution || {});
 
-    chartInstances.statusChart = new Chart(statusCtx, {
-        type: "polarArea",
-        data: {
-            labels: statusLabels,
-            datasets: [{
-                data: statusCounts,
-                backgroundColor: [
-                    "rgba(16, 185, 129, 0.75)", // Distinction
-                    "rgba(59, 130, 246, 0.75)",  // Good Standing
-                    "rgba(239, 68, 68, 0.75)"    // Needs Improvement
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } }
-            }
+            chartInstances.statusChart = new Chart(statusCtx, {
+                type: "polarArea",
+                data: {
+                    labels: statusLabels,
+                    datasets: [{
+                        data: statusCounts,
+                        backgroundColor: [
+                            "rgba(16, 185, 129, 0.75)", // Distinction
+                            "rgba(59, 130, 246, 0.75)",  // Good Standing
+                            "rgba(239, 68, 68, 0.75)"    // Needs Improvement
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
         }
-    });
+    } catch (e) {
+        console.error("Error creating statusChart:", e);
+    }
 }
 
 /**
@@ -372,6 +409,12 @@ function openAddModal() {
     document.getElementById("studentForm").reset();
     document.getElementById("studentId").value = "";
     document.getElementById("rollNumber").disabled = false;
+    clearModalAlert();
+
+    const saveBtn = document.getElementById("saveStudentBtn");
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Student Record';
+
     calcPreview();
     document.getElementById("studentModal").classList.add("active");
 }
@@ -396,13 +439,35 @@ function openEditModal(studentId) {
     document.getElementById("historyMarks").value = student.history_marks;
     document.getElementById("csMarks").value = student.cs_marks;
     document.getElementById("attendance").value = student.attendance;
+    clearModalAlert();
+
+    const saveBtn = document.getElementById("saveStudentBtn");
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Update Student Record';
 
     calcPreview();
     document.getElementById("studentModal").classList.add("active");
 }
 
 function closeModal() {
+    clearModalAlert();
     document.getElementById("studentModal").classList.remove("active");
+}
+
+function showModalAlert(message) {
+    const box = document.getElementById("modalAlert");
+    if (box) {
+        box.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> <span>${escapeHtml(message)}</span>`;
+        box.style.display = "flex";
+    }
+}
+
+function clearModalAlert() {
+    const box = document.getElementById("modalAlert");
+    if (box) {
+        box.style.display = "none";
+        box.innerHTML = "";
+    }
 }
 
 /**
@@ -410,20 +475,37 @@ function closeModal() {
  */
 async function handleFormSubmit(event) {
     event.preventDefault();
+    clearModalAlert();
+
+    const saveBtn = document.getElementById("saveStudentBtn");
+    const originalText = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
     const studentId = document.getElementById("studentId").value;
     const isEdit = Boolean(studentId);
 
+    const rollNumber = document.getElementById("rollNumber").value.trim();
+    const studentName = document.getElementById("studentName").value.trim();
+
+    if (!rollNumber || !studentName) {
+        showModalAlert("Please fill in both Roll Number and Student Name.");
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+        return;
+    }
+
     const payload = {
-        roll_number: document.getElementById("rollNumber").value.trim(),
-        name: document.getElementById("studentName").value.trim(),
+        roll_number: rollNumber,
+        name: studentName,
         department: document.getElementById("department").value,
-        semester: parseInt(document.getElementById("semester").value),
-        math_marks: parseFloat(document.getElementById("mathMarks").value),
-        science_marks: parseFloat(document.getElementById("scienceMarks").value),
-        english_marks: parseFloat(document.getElementById("englishMarks").value),
-        history_marks: parseFloat(document.getElementById("historyMarks").value),
-        cs_marks: parseFloat(document.getElementById("csMarks").value),
-        attendance: parseFloat(document.getElementById("attendance").value)
+        semester: parseInt(document.getElementById("semester").value) || 1,
+        math_marks: isNaN(parseFloat(document.getElementById("mathMarks").value)) ? 0 : parseFloat(document.getElementById("mathMarks").value),
+        science_marks: isNaN(parseFloat(document.getElementById("scienceMarks").value)) ? 0 : parseFloat(document.getElementById("scienceMarks").value),
+        english_marks: isNaN(parseFloat(document.getElementById("englishMarks").value)) ? 0 : parseFloat(document.getElementById("englishMarks").value),
+        history_marks: isNaN(parseFloat(document.getElementById("historyMarks").value)) ? 0 : parseFloat(document.getElementById("historyMarks").value),
+        cs_marks: isNaN(parseFloat(document.getElementById("csMarks").value)) ? 0 : parseFloat(document.getElementById("csMarks").value),
+        attendance: isNaN(parseFloat(document.getElementById("attendance").value)) ? 0 : parseFloat(document.getElementById("attendance").value)
     };
 
     try {
@@ -432,21 +514,37 @@ async function handleFormSubmit(event) {
 
         const res = await fetch(url, {
             method: method,
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
             body: JSON.stringify(payload)
         });
 
-        const result = await res.json();
+        let result;
+        try {
+            result = await res.json();
+        } catch (jsonErr) {
+            result = { success: false, error: `Server error (${res.status} ${res.statusText})` };
+        }
+
         if (result.success) {
             closeModal();
-            showAlert(result.message || "Student saved successfully!");
+            showAlert(result.message || "Student record saved successfully!");
             await loadDashboardData();
         } else {
-            showAlert(result.error || "Failed to save student.", true);
+            const errorMsg = result.error || "Failed to save student record.";
+            showModalAlert(errorMsg);
+            showAlert(errorMsg, true);
         }
     } catch (err) {
         console.error("Save error:", err);
-        showAlert("Server error while saving student record.", true);
+        const networkError = "Network error connecting to server. Please check your connection.";
+        showModalAlert(networkError);
+        showAlert(networkError, true);
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
     }
 }
 
@@ -573,7 +671,7 @@ async function resetDefaultData() {
 }
 
 /**
- * Toast / Alert Notification
+ * Toast / Alert Notification (Floating top-right)
  */
 function showAlert(message, isError = false) {
     const banner = document.getElementById("alertBanner");

@@ -5,10 +5,28 @@ Handles SQLite operations, metric calculations, and default data seeding.
 
 import os
 import sqlite3
+import tempfile
 from typing import Dict, Any, List, Optional, Tuple
 
-DEFAULT_DB_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_DB_PATH = os.path.join(DEFAULT_DB_DIR, "students.db")
+
+def get_database_path() -> str:
+    """Returns safe database path with fallback to writable directory if needed."""
+    if "DATABASE_PATH" in os.environ:
+        return os.environ["DATABASE_PATH"]
+
+    target_dir = os.path.dirname(os.path.abspath(__file__))
+    try:
+        os.makedirs(target_dir, exist_ok=True)
+        test_file = os.path.join(target_dir, ".perm_test")
+        with open(test_file, "w") as f:
+            f.write("ok")
+        os.remove(test_file)
+        return os.path.join(target_dir, "students.db")
+    except Exception:
+        return os.path.join(tempfile.gettempdir(), "students.db")
+
+
+DEFAULT_DB_PATH = get_database_path()
 
 
 def calculate_metrics(
@@ -41,7 +59,7 @@ def calculate_metrics(
         grade = "F"
 
     # Status / Needs Improvement identification
-    # A student needs improvement if overall percentage < 60% OR attendance < 75% OR failed in any subject (< 40)
+    # A student needs improvement if overall percentage < 50% OR attendance < 75% OR failed in any subject (< 40)
     failed_subject = any(score < 40.0 for score in [math, science, english, history, cs])
     if percentage < 50.0 or attendance < 75.0 or failed_subject:
         status = "Needs Improvement"
@@ -54,11 +72,16 @@ def calculate_metrics(
 
 
 def get_db_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
-    """Creates a database connection with dict-like row access."""
-    path = db_path or DEFAULT_DB_PATH
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    conn = sqlite3.connect(path)
+    """Creates a database connection with concurrency safety and dict-like row access."""
+    path = db_path or get_database_path()
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    conn = sqlite3.connect(path, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=5000;")
+    except sqlite3.OperationalError:
+        pass
     return conn
 
 
@@ -97,7 +120,7 @@ def init_db(db_path: Optional[str] = None) -> None:
 
 
 def seed_default_students(db_path: Optional[str] = None) -> None:
-    """Seeds realistic student records for demonstration and viva presentation."""
+    """Seeds realistic student records for initial demonstration."""
     sample_students = [
         ("DS101", "Aarav Sharma", "Data Science", 5, 92, 88, 85, 90, 95, 94.5),
         ("DS102", "Priya Patel", "Data Science", 5, 78, 82, 80, 74, 88, 86.0),
@@ -151,13 +174,17 @@ def get_student_by_id(student_id: int, db_path: Optional[str] = None) -> Optiona
 
 def add_student(data: Dict[str, Any], db_path: Optional[str] = None) -> Dict[str, Any]:
     """Add a new student record."""
+    roll = str(data["roll_number"]).strip().upper()
+    name = str(data["name"]).strip()
+    dept = str(data.get("department", "General")).strip()
+    sem = int(data.get("semester", 1))
+
     math = float(data["math_marks"])
     sci = float(data["science_marks"])
     eng = float(data["english_marks"])
     hist = float(data["history_marks"])
     cs = float(data["cs_marks"])
     att = float(data["attendance"])
-    sem = int(data.get("semester", 1))
 
     total, pct, grade, status = calculate_metrics(math, sci, eng, hist, cs, att)
 
@@ -170,17 +197,21 @@ def add_student(data: Dict[str, Any], db_path: Optional[str] = None) -> Dict[str
             attendance, total_marks, percentage, grade, status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        data["roll_number"].strip().upper(),
-        data["name"].strip(),
-        data.get("department", "General").strip(),
-        sem,
+        roll, name, dept, sem,
         math, sci, eng, hist, cs, att,
         total, pct, grade, status
     ))
     conn.commit()
     new_id = cursor.lastrowid
     conn.close()
-    return get_student_by_id(new_id, db_path) # type: ignore
+
+    if new_id is None:
+        raise RuntimeError("Insert operation did not return an inserted row ID.")
+
+    saved = get_student_by_id(new_id, db_path)
+    if not saved:
+        raise RuntimeError(f"Failed to retrieve student with ID {new_id} after creation.")
+    return saved
 
 
 def update_student(student_id: int, data: Dict[str, Any], db_path: Optional[str] = None) -> Optional[Dict[str, Any]]:

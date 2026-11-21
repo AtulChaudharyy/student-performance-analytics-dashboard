@@ -103,7 +103,7 @@ Educational institutions often face difficulties in tracking student academic pe
                   +-----------------------------------+
 ```
 
-An interactive vector diagram is available in [`architecture/architecture_diagram.svg`](architecture/architecture_diagram.svg). To view and capture your screenshot for Question 9, open [`architecture/view_architecture.html`](architecture/view_architecture.html) in your browser.
+An interactive vector diagram is available in [`architecture/architecture_diagram.svg`](architecture/architecture_diagram.svg). To view the architecture interactively, open [`architecture/view_architecture.html`](architecture/view_architecture.html) in your browser.
 
 ---
 
@@ -118,7 +118,7 @@ student-performance-analytics/
 │
 ├── architecture/
 │   ├── architecture_diagram.svg # Architecture diagram vector
-│   └── view_architecture.html  # Viewer for Question 9 screenshot
+│   └── view_architecture.html  # Interactive architecture viewer
 │
 ├── data/
 │   ├── database.py             # SQLite CRUD operations & metrics logic
@@ -240,25 +240,39 @@ The workflow `.github/workflows/deploy.yml` triggers automatically on every push
 
 ---
 
-## 📋 10. Form & Viva Quick Reference Guide
+## 📋 10. Operational Runbook & Verification
 
-| Question # | Rubric Item | Exact Submission Detail |
-|---|---|---|
-| **Q5** | Problem Statement | Educational institutions often face difficulties in tracking student academic performance, attendance, and identifying students who require academic support. This project provides a centralized web-based analytics dashboard that manages student records, calculates performance metrics, visualizes academic results, and identifies students needing improvement through an easy-to-use interface. |
-| **Q6** | Project Title | Student Performance Analytics Dashboard – Cloud-Based DevOps Application |
-| **Q7 / Q11** | GitHub Repo URL | `https://github.com/AtulChaudharyy/student-performance-analytics-dashboard` |
-| **Q8** | Cloud Platform | **Render Cloud Platform** (Select "Other") |
-| **Q9** | Architecture Screenshot | Open `architecture/view_architecture.html` and take a screenshot |
-| **Q10** | Repository Structure Screenshot | Screenshot your GitHub repository main file tree |
-| **Q12** | Docker Screenshot | Screenshot terminal running `docker run -p 5000:5000` with browser side-by-side |
-| **Q13** | CI/CD Screenshot | Screenshot GitHub Actions tab showing green checkmark for `CI/CD Pipeline` |
-| **Q14** | Cloud Dashboard Screenshot | Screenshot Render Dashboard showing **Live** status |
-| **Q15** | Live URL | `https://student-performance-analytics-xxxx.onrender.com` |
-| **Q16** | Challenges & Resolutions | Resolved environment parity between local Windows and Linux container via multi-stage Dockerfile and PORT variable adaptation; automated testing with PyTest in GitHub Actions CI/CD to eliminate regressions; configured Render health checks for zero-downtime deployments. |
-| **Q17** | ZIP File from Drive | Run `create_submission_zip.py` and upload the generated ZIP to Google Drive with public viewer link |
-| **Q18** | Student Declaration | **YES** |
+### Health Probe Verification
+Verify the service status and database connectivity:
+```bash
+curl -f https://<your-service-name>.onrender.com/health
+```
+Expected JSON Response:
+```json
+{
+  "status": "healthy",
+  "service": "Student Performance Analytics Dashboard",
+  "version": "1.0.0",
+  "database": "connected",
+  "students_recorded": 12,
+  "timestamp": "2026-11-21T15:46:14Z"
+}
+```
+
+### Automated PyTest Verification
+Run the 12 automated unit and integration tests locally or in CI:
+```bash
+pytest -v
+```
+
+### Docker Diagnostics
+Inspect running container status and logs:
+```bash
+docker ps
+docker logs --tail 50 -f student-app
+```
 
 ---
 
 ## 📄 License
-This project is licensed under the MIT License - open-source for educational and academic submission.
+This project is licensed under the MIT License - open-source software.
