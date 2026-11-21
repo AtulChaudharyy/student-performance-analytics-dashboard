@@ -154,8 +154,8 @@ student-performance-analytics/
 ### Step-by-Step Run:
 ```bash
 # 1. Clone repository
-git clone https://github.com/<your-username>/student-performance-analytics.git
-cd student-performance-analytics
+git clone https://github.com/AtulChaudharyy/student-performance-analytics-dashboard.git
+cd student-performance-analytics-dashboard
 
 # 2. Create virtual environment
 python -m venv .venv
@@ -246,7 +246,7 @@ The workflow `.github/workflows/deploy.yml` triggers automatically on every push
 |---|---|---|
 | **Q5** | Problem Statement | Educational institutions often face difficulties in tracking student academic performance, attendance, and identifying students who require academic support. This project provides a centralized web-based analytics dashboard that manages student records, calculates performance metrics, visualizes academic results, and identifies students needing improvement through an easy-to-use interface. |
 | **Q6** | Project Title | Student Performance Analytics Dashboard – Cloud-Based DevOps Application |
-| **Q7 / Q11** | GitHub Repo URL | `https://github.com/<your-username>/student-performance-analytics` |
+| **Q7 / Q11** | GitHub Repo URL | `https://github.com/AtulChaudharyy/student-performance-analytics-dashboard` |
 | **Q8** | Cloud Platform | **Render Cloud Platform** (Select "Other") |
 | **Q9** | Architecture Screenshot | Open `architecture/view_architecture.html` and take a screenshot |
 | **Q10** | Repository Structure Screenshot | Screenshot your GitHub repository main file tree |
