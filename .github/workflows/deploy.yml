@@ -1,0 +1,73 @@
+name: CI/CD Pipeline - Build, Test & Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    name: Test & Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Set Up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 3. Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 4. Code Syntax & Integrity Check
+        run: |
+          python -m py_compile app.py data/database.py tests/test_app.py
+
+      - name: 5. Execute Automated PyTest Suite
+        run: |
+          pytest -v
+
+      - name: 6. Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 7. Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: student-performance-analytics:latest
+
+      - name: 8. Verify Container Boot & Healthcheck
+        run: |
+          docker run -d -p 5000:5000 --name spad-container student-performance-analytics:latest
+          sleep 6
+          curl -f http://localhost:5000/health || exit 1
+          docker stop spad-container
+
+  deploy:
+    name: Cloud Deployment (Render)
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: 1. Trigger Render Cloud Deployment
+        run: |
+          echo "=========================================================="
+          echo "CI/CD Pipeline: Automated Tests & Docker Build Passed!"
+          echo "Triggering Cloud Deployment to Render..."
+          echo "=========================================================="
+          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+            echo "Deploy hook successfully triggered on Render."
+          else
+            echo "Direct GitHub-connected auto-deploy enabled on Render."
+          fi

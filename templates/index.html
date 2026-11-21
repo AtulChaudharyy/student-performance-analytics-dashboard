@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Performance Analytics Dashboard | DevOps & Cloud Platform</title>
+    <!-- Google Fonts & FontAwesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <h1>Student Performance Analytics Dashboard</h1>
+                    <span class="sub-brand">Cloud-Native DevOps Application • Python Flask & Docker</span>
+                </div>
+            </div>
+            <div class="nav-badges">
+                <span class="badge badge-pulse"><span class="pulse-dot"></span> System Live</span>
+                <span class="badge badge-tech"><i class="fa-brands fa-docker"></i> Docker</span>
+                <span class="badge badge-tech"><i class="fa-brands fa-github"></i> CI/CD Active</span>
+                <span class="badge badge-cloud"><i class="fa-solid fa-cloud"></i> Render Cloud</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container">
+        
+        <!-- Action Notification Banner -->
+        <div id="alertBanner" class="alert-banner" style="display: none;">
+            <i class="fa-solid fa-circle-check"></i>
+            <span id="alertMessage">Operation completed successfully.</span>
+            <button class="close-alert" onclick="hideAlert()">&times;</button>
+        </div>
+
+        <!-- Metric KPI Cards -->
+        <section class="kpi-grid">
+            <div class="kpi-card card-blue">
+                <div class="kpi-info">
+                    <span class="kpi-title">Total Students</span>
+                    <h2 class="kpi-value" id="kpiTotalStudents">--</h2>
+                    <span class="kpi-sub"><i class="fa-solid fa-users"></i> Active Enrollments</span>
+                </div>
+                <div class="kpi-icon-box">
+                    <i class="fa-solid fa-user-graduate"></i>
+                </div>
+            </div>
+
+            <div class="kpi-card card-purple">
+                <div class="kpi-info">
+                    <span class="kpi-title">Class Average Score</span>
+                    <h2 class="kpi-value" id="kpiAvgScore">--%</h2>
+                    <span class="kpi-sub"><i class="fa-solid fa-chart-line"></i> Overall Performance</span>
+                </div>
+                <div class="kpi-icon-box">
+                    <i class="fa-solid fa-calculator"></i>
+                </div>
+            </div>
+
+            <div class="kpi-card card-emerald">
+                <div class="kpi-info">
+                    <span class="kpi-title">Passing Rate</span>
+                    <h2 class="kpi-value" id="kpiPassRate">--%</h2>
+                    <span class="kpi-sub"><i class="fa-solid fa-circle-check"></i> Score &ge; 50%</span>
+                </div>
+                <div class="kpi-icon-box">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+            </div>
+
+            <div class="kpi-card card-cyan">
+                <div class="kpi-info">
+                    <span class="kpi-title">Avg Attendance</span>
+                    <h2 class="kpi-value" id="kpiAttendance">--%</h2>
+                    <span class="kpi-sub"><i class="fa-solid fa-clock"></i> Minimum Target 75%</span>
+                </div>
+                <div class="kpi-icon-box">
+                    <i class="fa-solid fa-calendar-check"></i>
+                </div>
+            </div>
+
+            <div class="kpi-card card-rose">
+                <div class="kpi-info">
+                    <span class="kpi-title">Needs Improvement</span>
+                    <h2 class="kpi-value text-danger" id="kpiNeedsImprovement">--</h2>
+                    <span class="kpi-sub"><i class="fa-solid fa-triangle-exclamation"></i> Low Attendance / Marks</span>
+                </div>
+                <div class="kpi-icon-box icon-danger">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+            </div>
+
+            <div class="kpi-card card-amber">
+                <div class="kpi-info">
+                    <span class="kpi-title">Top Academic Performer</span>
+                    <h3 class="kpi-performer-name" id="kpiTopName">--</h3>
+                    <span class="kpi-sub" id="kpiTopDetails"><i class="fa-solid fa-trophy"></i> Outstanding</span>
+                </div>
+                <div class="kpi-icon-box icon-trophy">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section class="charts-grid">
+            <!-- Chart 1: Grade Distribution -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3><i class="fa-solid fa-chart-pie"></i> Grade Distribution</h3>
+                    <span class="chart-badge">Overall Cohort</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="gradeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Subject-wise Averages -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3><i class="fa-solid fa-chart-bar"></i> Subject-Wise Average Scores</h3>
+                    <span class="chart-badge">Benchmark 100</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="subjectChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 3: Department Performance Comparison -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3><i class="fa-solid fa-network-wired"></i> Department Performance Averages</h3>
+                    <span class="chart-badge">Cross-Stream</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="deptChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 4: Academic Standing & Risk Status -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3><i class="fa-solid fa-shield-halved"></i> Academic Standing Distribution</h3>
+                    <span class="chart-badge">Support Tiers</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Action / Filter Toolbar -->
+        <section class="table-section">
+            <div class="table-card">
+                <div class="table-header-bar">
+                    <div class="table-title">
+                        <h2><i class="fa-solid fa-table-list"></i> Student Academic Records</h2>
+                        <span class="table-subtitle">Comprehensive record of marks, grades, attendance, and analytics</span>
+                    </div>
+                    <div class="table-actions">
+                        <button class="btn btn-primary" onclick="openAddModal()">
+                            <i class="fa-solid fa-user-plus"></i> Add Student
+                        </button>
+                        <a href="/api/export" class="btn btn-outline" download>
+                            <i class="fa-solid fa-file-csv"></i> Export CSV
+                        </a>
+                        <button class="btn btn-secondary" onclick="loadDashboardData()">
+                            <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filters & Search Toolbar -->
+                <div class="filter-toolbar">
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="searchInput" placeholder="Search by name, roll number, or department..." oninput="filterTable()">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filterDepartment"><i class="fa-solid fa-building-columns"></i> Department:</label>
+                        <select id="filterDepartment" onchange="filterTable()">
+                            <option value="">All Departments</option>
+                            <option value="Data Science">Data Science</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="AI & ML">AI & ML</option>
+                            <option value="Information Tech">Information Tech</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filterStatus"><i class="fa-solid fa-filter"></i> Status:</label>
+                        <select id="filterStatus" onchange="filterTable()">
+                            <option value="">All Statuses</option>
+                            <option value="Distinction">Distinction (&ge;85%)</option>
+                            <option value="Good Standing">Good Standing</option>
+                            <option value="Needs Improvement">Needs Improvement</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Responsive Student Table -->
+                <div class="table-responsive">
+                    <table class="data-table" id="studentsTable">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable(0)">Roll No <i class="fa-solid fa-sort"></i></th>
+                                <th onclick="sortTable(1)">Student Name <i class="fa-solid fa-sort"></i></th>
+                                <th>Department</th>
+                                <th>Math</th>
+                                <th>Science</th>
+                                <th>English</th>
+                                <th>History</th>
+                                <th>CS</th>
+                                <th onclick="sortTable(8)">Total <i class="fa-solid fa-sort"></i></th>
+                                <th onclick="sortTable(9)">Percentage <i class="fa-solid fa-sort"></i></th>
+                                <th onclick="sortTable(10)">Attendance <i class="fa-solid fa-sort"></i></th>
+                                <th>Grade</th>
+                                <th>Academic Status</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentTableBody">
+                            <tr>
+                                <td colspan="14" class="text-center py-4">Loading student records...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Footer / Summary -->
+                <div class="table-footer">
+                    <span id="recordCountInfo">Showing 0 of 0 students</span>
+                    <button class="btn btn-sm btn-outline" onclick="resetDefaultData()">
+                        <i class="fa-solid fa-database"></i> Re-seed Sample Data
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- DevOps Architecture Highlights Panel -->
+        <section class="devops-info-section">
+            <div class="devops-card">
+                <h3><i class="fa-solid fa-diagram-project"></i> Project DevOps Architecture Overview</h3>
+                <div class="architecture-flow">
+                    <div class="arch-step">
+                        <div class="arch-icon"><i class="fa-solid fa-code"></i></div>
+                        <h4>1. Codebase</h4>
+                        <p>Flask, SQLite, Responsive HTML5 & Chart.js</p>
+                    </div>
+                    <div class="arch-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="arch-step">
+                        <div class="arch-icon"><i class="fa-brands fa-github"></i></div>
+                        <h4>2. GitHub</h4>
+                        <p>Version Control & Trunk-based Workflow</p>
+                    </div>
+                    <div class="arch-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="arch-step">
+                        <div class="arch-icon"><i class="fa-solid fa-gears"></i></div>
+                        <h4>3. Actions CI/CD</h4>
+                        <p>Auto Linting, PyTest Suite & Docker Build</p>
+                    </div>
+                    <div class="arch-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="arch-step">
+                        <div class="arch-icon"><i class="fa-brands fa-docker"></i></div>
+                        <h4>4. Container</h4>
+                        <p>Docker Containerized with Gunicorn WSGI</p>
+                    </div>
+                    <div class="arch-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="arch-step highlight-step">
+                        <div class="arch-icon"><i class="fa-solid fa-cloud"></i></div>
+                        <h4>5. Render Cloud</h4>
+                        <p>Continuous Deployment & Live Production URL</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Student Add / Edit Modal -->
+    <div id="studentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle"><i class="fa-solid fa-user-plus"></i> Add New Student</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="studentForm" onsubmit="handleFormSubmit(event)">
+                <input type="hidden" id="studentId">
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="rollNumber">Roll Number *</label>
+                        <input type="text" id="rollNumber" placeholder="e.g. DS115" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="studentName">Student Full Name *</label>
+                        <input type="text" id="studentName" placeholder="e.g. Rohan Verma" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="department">Department *</label>
+                        <select id="department" required>
+                            <option value="Data Science">Data Science</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="AI & ML">AI & ML</option>
+                            <option value="Information Tech">Information Tech</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="semester">Semester *</label>
+                        <select id="semester" required>
+                            <option value="1">Semester 1</option>
+                            <option value="2">Semester 2</option>
+                            <option value="3">Semester 3</option>
+                            <option value="4">Semester 4</option>
+                            <option value="5" selected>Semester 5</option>
+                            <option value="6">Semester 6</option>
+                            <option value="7">Semester 7</option>
+                            <option value="8">Semester 8</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-divider">
+                    <span>Subject Marks (0 to 100)</span>
+                </div>
+
+                <div class="form-grid scores-grid">
+                    <div class="form-group">
+                        <label for="mathMarks">Mathematics</label>
+                        <input type="number" id="mathMarks" min="0" max="100" step="0.5" value="75" required oninput="calcPreview()">
+                    </div>
+                    <div class="form-group">
+                        <label for="scienceMarks">Science</label>
+                        <input type="number" id="scienceMarks" min="0" max="100" step="0.5" value="75" required oninput="calcPreview()">
+                    </div>
+                    <div class="form-group">
+                        <label for="englishMarks">English</label>
+                        <input type="number" id="englishMarks" min="0" max="100" step="0.5" value="75" required oninput="calcPreview()">
+                    </div>
+                    <div class="form-group">
+                        <label for="historyMarks">History</label>
+                        <input type="number" id="historyMarks" min="0" max="100" step="0.5" value="75" required oninput="calcPreview()">
+                    </div>
+                    <div class="form-group">
+                        <label for="csMarks">Computer Science</label>
+                        <input type="number" id="csMarks" min="0" max="100" step="0.5" value="75" required oninput="calcPreview()">
+                    </div>
+                    <div class="form-group">
+                        <label for="attendance">Attendance (%)</label>
+                        <input type="number" id="attendance" min="0" max="100" step="0.5" value="85" required oninput="calcPreview()">
+                    </div>
+                </div>
+
+                <!-- Live Auto-Calculation Preview -->
+                <div class="calc-preview-card">
+                    <div class="calc-item">
+                        <span>Total Marks:</span>
+                        <strong id="previewTotal">375 / 500</strong>
+                    </div>
+                    <div class="calc-item">
+                        <span>Percentage:</span>
+                        <strong id="previewPercentage">75.0%</strong>
+                    </div>
+                    <div class="calc-item">
+                        <span>Projected Grade:</span>
+                        <span class="grade-badge grade-b" id="previewGrade">B</span>
+                    </div>
+                    <div class="calc-item">
+                        <span>Status:</span>
+                        <span class="status-badge status-good" id="previewStatus">Good Standing</span>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveStudentBtn">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Student Record
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Student Detail Report Card Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content modal-detail">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-id-card"></i> Student Academic Report</h3>
+                <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+            </div>
+            <div id="detailContent" class="detail-body">
+                <!-- Dynamically populated -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="window.print()">
+                    <i class="fa-solid fa-print"></i> Print Report
+                </button>
+                <button type="button" class="btn btn-outline" onclick="closeDetailModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <p><strong>Student Performance Analytics Dashboard (SPAD)</strong> | Cloud-Based DevOps Application</p>
+            <p class="footer-tech">Engineered with Python Flask, SQLite, Chart.js, Docker, GitHub Actions CI/CD, and Render Cloud</p>
+        </div>
+    </footer>
+
+    <!-- App Script -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
